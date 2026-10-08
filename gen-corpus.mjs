@@ -133,5 +133,5 @@ for (const { name, opts } of cases) {
 }
 src += ')\n';
 
-writeFileSync('/home/hatch/workspace/repos/sakayori-music/peek/src/test/kotlin/com/sakayori/peek/CorpusData.kt', src);
+writeFileSync('/home/hatch/workspace/repos/peek-kotlin/src/test/kotlin/com/sakayori/peek/CorpusData.kt', src);
 console.log(`wrote ${cases.length} cases`);
