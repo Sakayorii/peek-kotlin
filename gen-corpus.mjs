@@ -1,0 +1,137 @@
+// Generates CorpusData.kt: golden SVGs from peek-vanilla for the Kotlin port's tests.
+// Run: node gen-corpus.mjs
+import { toSvg } from '/home/hatch/workspace/repos/peek-vanilla/src/svg.js';
+import { writeFileSync } from 'node:fs';
+
+const EXPRESSIONS = ['normal', 'happy', 'sad', 'angry', 'sleepy', 'curious',
+  'surprised', 'excited', 'confused', 'bored', 'attentive'];
+const FACES = ['diamond', 'semicircle', 'circle', 'triangle'];
+const COLORS = ['lavender', 'fog', 'clay', 'mint', 'butter', 'rose', 'aqua'];
+const EYES = ['oval', 'bead', 'ring'];
+const BROWS = ['arch', 'bar', 'wedge', 'dash'];
+const MOUTHS = ['poly', 'round', 'line', 'box'];
+const CHEEKS = ['oval', 'dots', 'lines'];
+const TRAITS = ['square', 'fin', 'ring', 'dot', 'peak'];
+
+// Seeded PRNG for reproducible fuzz (mulberry32, same as the lib).
+function rng(seed) {
+  let a = seed | 0;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const names = [
+  'Sakayori', 'sakayori', 'SAKAYORI', '  Sakayori  ', 'saka   yori',
+  'Rem', 'a', 'ab', 'abc', 'Yukki', 'iroha', 'htingale',
+  'Nguyễn Văn An', 'trần thị bưởi', 'Đỗ', 'Sơn Tùng M-TP',
+  'さかより', 'サカヨリ', '酒寄', ' peek ', 'e\u0301', 'é',
+  '😀', '🎵🎧', 'a😀b', 'x\u0001y', 'a&b<c>d"e\'f', 'lone\uD800surrogate',
+  'tab\there', 'new\nline', '  ', '', 'x'.repeat(200),
+  'John Doe 123', 'user_name-test', 'UPPER lower MiXeD',
+  'Ångström', 'naïve café', 'Ζεύς', 'Москва', 'العربية',
+];
+
+const cases = [];
+const add = (name, opts = {}) => cases.push({ name, opts });
+
+// default for every name
+for (const name of names) add(name);
+// every expression for a few names
+for (const name of ['Sakayori', 'rem', 'Nguyễn Văn An', '😀']) {
+  for (const expression of EXPRESSIONS) add(name, { expression });
+}
+// every axis override
+const axisCases = [
+  ...FACES.map((face) => ({ face })), ...COLORS.map((color) => ({ color })),
+  ...EYES.map((eyes) => ({ eyes })), ...BROWS.map((brows) => ({ brows })),
+  ...MOUTHS.map((mouth) => ({ mouth })), ...CHEEKS.map((cheeks) => ({ cheeks })),
+  ...TRAITS.map((trait) => ({ trait })),
+];
+for (const opts of axisCases) add('Sakayori', opts);
+// sizes (strokeFor branches + riso smooth), frames, riso, square, titles
+for (const size of [24, 29, 30, 39, 40, 55, 56, 95, 96, 120, 480, 640])
+  add('Sakayori', { size });
+for (const frame of ['ink', 'bone', 'paper', 'none']) add('Sakayori', { frame });
+for (const frame of ['ink', 'paper', 'none']) add('Sakayori', { frame, riso: true });
+add('Sakayori', { riso: true, size: 480 });
+add('Sakayori', { square: false });
+add('Sakayori', { square: false, frame: 'none' });
+add('a&b<c>d"e', {}); // esc() in aria-label/title
+add('Sakayori', { title: 'Custom <Title> & "quoted"' });
+add('Sakayori', { hideTitle: true });
+add('Sakayori', { id: 'custom-id-1' });
+add('Sakayori', { expression: 'bored' }); // dim filter path
+add('Sakayori', { expression: 'bored', frame: 'none' });
+add('Sakayori', { gaze: [0.5, -0.3] });
+add('Sakayori', { expression: 'curious', gaze: [0, 0] });
+
+// fuzz: 300 seeded random names from a nasty alphabet
+const ALPHA = 'abcXYZ019 \té😀&<>"\'\u0301\u00A0\u2003日本語';
+const r = rng(123456789);
+for (let n = 0; n < 300; n++) {
+  const len = 1 + Math.floor(r() * 24);
+  let s = '';
+  for (let i = 0; i < len; i++) s += ALPHA[Math.floor(r() * ALPHA.length)];
+  const optsPool = [{}, { expression: EXPRESSIONS[Math.floor(r() * 11)] },
+    { square: false }, { frame: 'none' }, { size: 24 + Math.floor(r() * 500) }];
+  add(s, optsPool[Math.floor(r() * optsPool.length)]);
+}
+
+// Kotlin string escaping: everything outside printable ASCII becomes \uXXXX
+// (keeps lone surrogates and astral chars safe in the .kt source).
+const kstr = (s) => '"' + Array.from(s).map((ch) => {
+  const cp = ch.codePointAt(0);
+  if (ch === '\\') return '\\\\';
+  if (ch === '"') return '\\"';
+  if (ch === '$') return '${"$"}';
+  if (ch === '\n') return '\\n';
+  if (ch === '\r') return '\\r';
+  if (ch === '\t') return '\\t';
+  if (cp >= 0x20 && cp < 0x7F) return ch;
+  let out = '';
+  for (let i = 0; i < ch.length; i++)
+    out += '\\u' + ch.charCodeAt(i).toString(16).padStart(4, '0');
+  return out;
+}).join('') + '"';
+
+const knum = (x) => Number.isInteger(x) ? x + '.0' : String(x);
+
+const optKotlin = (opts) => {
+  const parts = [];
+  for (const [k, v] of Object.entries(opts)) {
+    if (k === 'gaze') {
+      parts.push(`gaze = doubleArrayOf(${knum(v[0])}, ${knum(v[1])})`);
+    } else if (typeof v === 'string') parts.push(`${k} = ${kstr(v)}`);
+    else if (typeof v === 'number') parts.push(`${k} = ${knum(v)}`);
+    else if (typeof v === 'boolean') parts.push(`${k} = ${v}`);
+  }
+  return parts.length ? `PeekOptions(${parts.join(', ')})` : 'PeekOptions()';
+};
+
+let src = `package com.sakayori.peek
+
+// AUTO-GENERATED by gen-corpus.mjs — do not edit. Regenerate with:
+//   node gen-corpus.mjs
+// Golden SVGs from peek-vanilla; the port must reproduce them byte-for-byte.
+
+data class GoldenCase(val name: String, val opts: PeekOptions, val expected: String)
+
+val GOLDEN_CORPUS: List<GoldenCase> = listOf(
+`;
+const toJsOpts = (opts) => {
+  const o = { ...opts };
+  if (o.hideTitle) { o.title = false; delete o.hideTitle; } // peek-vanilla knows title:false
+  return o;
+};
+for (const { name, opts } of cases) {
+  const svg = toSvg(name, toJsOpts(opts));
+  src += `    GoldenCase(${kstr(name)}, ${optKotlin(opts)}, ${kstr(svg)}),\n`;
+}
+src += ')\n';
+
+writeFileSync('/home/hatch/workspace/repos/sakayori-music/peek/src/test/kotlin/com/sakayori/peek/CorpusData.kt', src);
+console.log(`wrote ${cases.length} cases`);
