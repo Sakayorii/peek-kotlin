@@ -26,5 +26,5 @@ rm -rf build && mkdir -p build/classes build/test-classes
 "$KOTLINC" src/test/kotlin -cp "build/classes:$JUNIT:$HAMCREST:$STDLIB" -d build/test-classes 2>&1 | grep -v "^warning:" || true
 
 echo "== running golden tests =="
-java -cp "build/classes:build/test-classes:$JUNIT:$HAMCREST:$STDLIB" \
-  org.junit.runner.JUnitCore com.sakayori.peek.PeekGoldenTest
+java -cp "build/classes:build/test-classes:src/test/resources:$JUNIT:$HAMCREST:$STDLIB" \
+  org.junit.runner.JUnitCore com.sakayori.peek.PeekGoldenTest com.sakayori.peek.PeekAnimateTest

@@ -8,9 +8,8 @@ Part of the peek family: `peek` (original, React) · `peek-vanilla` (JS) ·
 `peek-kotlin` (JVM) · `peek-rust` (Rust).
 
 ```
-peek/
-├── src/main/kotlin/com/sakayori/peek/
-│   ├── Js.kt        — JavaScript semantics, exactly (number printing, tidy, JSON)
+src/main/kotlin/com/sakayori/peek/
+├── Js.kt        — JavaScript semantics, exactly (number printing, tidy, JSON)
 │   ├── Identity.kt  — tidy / FNV-1a / mulberry32 / identify  (port of identity.js)
 │   ├── Tables.kt    — faces, colors, parts, expressions        (port of tables.js)
 │   ├── Scene.kt     — node tree model + prune                 (port of draw.js helpers)
@@ -68,3 +67,26 @@ val who: Identity = identify("Sakayori") // face, color, eyes, brows, mouth, che
   keystroke (the listen-together name field) is cheap.
 - The animated rig (`animate.js` → Compose) is a separate phase; this module is
   the deterministic engine it will drive.
+
+## Animation
+
+`PeekAnimator` is a headless port of peek-vanilla's `Live` rig (springs,
+choreography, blinks incl. double blink, saccades, breathing, gaze, expression
+transitions, reduced motion) — minus the DOM. The host owns the frame loop:
+construct it, call `step(dt)` each frame, and draw the returned `Pose`.
+
+```kotlin
+val animator = PeekAnimator(identify("Sakayori"), "normal")
+// each frame:
+val pose = animator.step(dtSeconds)
+draw(animator.who, pose, drawOpts) // -> SNode, render it how you like
+animator.setExpression("happy")
+```
+
+Pointer gaze: `PeekAnimator(who, watchPointer = true)` + `updatePointer(...)`
+each frame. Reduced motion: `setReduced(true)` snaps to the rest pose.
+Pass a seeded `rng` for reproducible tests.
+
+Verified pose-for-pose against the JS rig on 6 scripted scenarios
+(1800 poses: transitions, double blink, pointer/fixed gaze, all 11
+expressions, sleepy nods): worst drift 1.4e-15.
