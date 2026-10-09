@@ -1,6 +1,9 @@
 plugins {
     kotlin("jvm") version "2.4.10"
+    `maven-publish`
 }
+
+group = "com.sakayori.peek"
 
 repositories {
     mavenCentral()
@@ -14,11 +17,18 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
 }
 
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["java"])
+        }
+    }
+}
+
 // The golden corpus is generated from peek-vanilla (see gen-corpus.mjs).
-// Regenerate before running tests after touching the port:
-//   node gen-corpus.mjs
+// It is committed to the repo; regenerate manually after touching the port:
+//   ./gradlew regenerateCorpus
 tasks.named<Test>("test") {
-    dependsOn("regenerateCorpus")
     testLogging {
         showStandardStreams = true
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
