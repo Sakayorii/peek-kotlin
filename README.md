@@ -7,6 +7,15 @@ A name in, a face out: deterministic avatars, no network, no database.
 Part of the peek family: `peek` (original, React) · `peek-vanilla` (JS) ·
 `peek-kotlin` (JVM) · `peek-rust` (Rust).
 
+## Get it
+
+Via [JitPack](https://jitpack.io/#Sakayorii/peek-kotlin):
+
+```kotlin
+repositories { maven("https://jitpack.io") }
+dependencies { implementation("com.github.Sakayorii:peek-kotlin:v1.0.1") }
+```
+
 ```
 src/main/kotlin/com/sakayori/peek/
 ├── Js.kt        — JavaScript semantics, exactly (number printing, tidy, JSON)
