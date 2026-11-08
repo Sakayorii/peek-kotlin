@@ -15,7 +15,7 @@ Via [JitPack](https://jitpack.io/#Sakayorii/peek-kotlin):
 
 ```kotlin
 repositories { maven("https://jitpack.io") }
-dependencies { implementation("com.github.Sakayorii:peek-kotlin:v1.1.0") }
+dependencies { implementation("com.github.Sakayorii:peek-kotlin:v2.0.0") }
 ```
 
 ```
@@ -41,7 +41,7 @@ normalization, locale-independent lowercasing, and `JSON.stringify` key order
 for the deterministic SVG ids.
 
 Proof is mechanical, not vibes: `./verify.sh` compiles the port and diffs
-`toSvg()` against peek-vanilla's output for 500 cases (curated names with
+`toSvg()` against peek-vanilla's output for 667 cases (curated names with
 unicode/emoji/whitespace edge cases, every expression, every part override,
 every accessory slot and accessory combinations, sizes, frames, riso,
 titles, plus 300 seeded fuzz names). One byte off fails.
@@ -72,13 +72,15 @@ val who: Identity = identify("Sakayori") // face, color, eyes, brows, mouth, che
 (axis overrides win over the hash; an unknown accessory item is ignored and
 the name's pick is kept),
 `expression` (11 states), `gaze`, `size`, `frame` (`ink`/`bone`/`paper`/`none`),
-`square`, `riso`, `id`, `title`/`hideTitle`, `version`.
+`square`, `riso`, `id`, `title`/`hideTitle`, `version`, `variant` (`peek`, `haze` or `bloc`: how the face is drawn, never who it is; an unknown variant draws as peek).
 
 ## Upstream version
 
-This release ports upstream @doan-labs/peek 1.1.0: the accessories system
-(eyewear, headwear, neckwear) on top of the 1.0 engine. Faces without
-accessories render byte for byte as before.
+This release ports upstream @doan-labs/peek 2.0.0: the accessories system
+from 1.1 (eyewear, headwear, neckwear) and the drawing variants from 2.0
+(haze, bloc) on top of the 1.0 engine. Faces drawn with the peek variant
+render byte for byte as before. The golden corpus now holds 667 cases,
+including variants and variants combined with accessories.
 
 ## Notes for the app integration
 

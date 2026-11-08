@@ -32,6 +32,8 @@ data class PeekOptions(
     val title: String? = null,
     val hideTitle: Boolean = false,
     val version: Int = LATEST,
+    /** How the face is drawn: "peek", "haze" or "bloc". Never who it is. */
+    val variant: String? = null,
 )
 
 data class DrawOpts(
@@ -40,6 +42,7 @@ data class DrawOpts(
     val square: Boolean,
     val riso: Boolean,
     val live: Boolean,
+    val variant: String = "peek",
     val id: String,
     /** Resolved title: the name, an override, or null when hidden. */
     val title: String?,
@@ -81,13 +84,18 @@ internal fun poseToJson(pose: Pose): JVal {
     return JVal.Obj(entries)
 }
 
-internal fun lookToJson(o: PeekOptions, live: Boolean): JVal = JVal.Obj(linkedMapOf(
-    "size" to JVal.Num(o.size),
-    "frame" to JVal.Str(o.frame),
-    "square" to JVal.Bool(o.square),
-    "riso" to JVal.Bool(o.riso),
-    "live" to JVal.Bool(live),
-))
+internal fun lookToJson(o: PeekOptions, live: Boolean, variant: String): JVal {
+    val entries = linkedMapOf<String, JVal>(
+        "size" to JVal.Num(o.size),
+        "frame" to JVal.Str(o.frame),
+        "square" to JVal.Bool(o.square),
+        "riso" to JVal.Bool(o.riso),
+        "live" to JVal.Bool(live),
+    )
+    // left out for peek, so its ids and bytes stay as they were
+    if (variant != "peek") entries["variant"] = JVal.Str(variant)
+    return JVal.Obj(entries)
+}
 
 // an unknown item from untyped callers keeps what the name picked
 private fun wear(opt: String?, base: String, slot: String): String =
@@ -109,10 +117,12 @@ fun settle(name: String, o: PeekOptions, live: Boolean = false): Triple<Identity
     )
     val wardrobe = who.eyewear != "none" || who.headwear != "none" || who.neckwear != "none"
     val pose = restPose(who, o.expression, o.gaze)
+    // an unknown variant draws peek
+    val variant = if (o.variant != null && VARIANTS.contains(o.variant)) o.variant else "peek"
     val id = o.id ?: "peek-${
         fnv1a(
             jsJsonStringify(
-                JVal.Arr(listOf(whoToJson(who, wardrobe), poseToJson(pose), lookToJson(o, live))),
+                JVal.Arr(listOf(whoToJson(who, wardrobe), poseToJson(pose), lookToJson(o, live, variant))),
             ),
         ).toString(36)
     }"
@@ -122,6 +132,7 @@ fun settle(name: String, o: PeekOptions, live: Boolean = false): Triple<Identity
         square = o.square,
         riso = o.riso,
         live = live,
+        variant = variant,
         id = id,
         title = if (o.hideTitle) null else (o.title ?: name),
     )

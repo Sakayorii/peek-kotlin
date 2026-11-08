@@ -13,7 +13,7 @@ Qua [JitPack](https://jitpack.io/#Sakayorii/peek-kotlin):
 
 ```kotlin
 repositories { maven("https://jitpack.io") }
-dependencies { implementation("com.github.Sakayorii:peek-kotlin:v1.1.0") }
+dependencies { implementation("com.github.Sakayorii:peek-kotlin:v2.0.0") }
 ```
 
 ```
@@ -35,7 +35,7 @@ src/main/kotlin/com/sakayori/peek/
 
 Mọi hành vi của bản gốc ảnh hưởng tới kết quả đều được tái hiện, kể cả những phần nhàm chán: định dạng `String(number)` của JS, cách `Math.round` xử lý số ở giữa, chuẩn hóa NFC, chuyển chữ thường không phụ thuộc locale, và thứ tự key của `JSON.stringify` cho các id SVG xác định.
 
-Bằng chứng là cơ học, không phải cảm tính: `./verify.sh` biên dịch bản port và so `toSvg()` với kết quả của peek-vanilla trên 500 trường hợp (tên được chọn lọc với các ca biên về unicode, emoji, khoảng trắng, mọi biểu cảm, mọi ghi đè bộ phận, mọi slot phụ kiện và các tổ hợp phụ kiện, kích thước, frame, riso, tiêu đề, cộng thêm 300 tên fuzz có seed). Lệch một byte là trượt.
+Bằng chứng là cơ học, không phải cảm tính: `./verify.sh` biên dịch bản port và so `toSvg()` với kết quả của peek-vanilla trên 667 trường hợp (tên được chọn lọc với các ca biên về unicode, emoji, khoảng trắng, mọi biểu cảm, mọi ghi đè bộ phận, mọi slot phụ kiện và các tổ hợp phụ kiện, kích thước, frame, riso, tiêu đề, cộng thêm 300 tên fuzz có seed). Lệch một byte là trượt.
 
 ```bash
 ./verify.sh          # biên dịch + chạy test golden
@@ -56,15 +56,18 @@ val svg2: String = toSvg("Sakayori", PeekOptions(expression = "happy", square = 
 // mặc phụ kiện: ba slot độc lập, mặc định đều là none
 val svg3: String = toSvg("Sakayori", PeekOptions(eyewear = "glasses", headwear = "sprout", neckwear = "tie"))
 
+// đổi cách vẽ: cùng một tên, ba diện mạo (peek, haze, bloc)
+val svg4: String = toSvg("Sakayori", PeekOptions(variant = "bloc"))
+
 // danh tính mà không cần vẽ
 val who: Identity = identify("Sakayori") // face, color, eyes, brows, mouth, cheeks, trait, persona
 ```
 
-`PeekOptions` mô phỏng các props `toSvg` của peek-vanilla: `face`, `color`, `eyes`, `brows`, `mouth`, `cheeks`, `trait`, `eyewear`, `headwear`, `neckwear` (ghi đè theo trục thắng hàm băm; một món phụ kiện không hợp lệ sẽ bị bỏ qua và giữ lựa chọn theo tên), `expression` (11 trạng thái), `gaze`, `size`, `frame` (`ink`/`bone`/`paper`/`none`), `square`, `riso`, `id`, `title`/`hideTitle`, `version`.
+`PeekOptions` mô phỏng các props `toSvg` của peek-vanilla: `face`, `color`, `eyes`, `brows`, `mouth`, `cheeks`, `trait`, `eyewear`, `headwear`, `neckwear` (ghi đè theo trục thắng hàm băm; một món phụ kiện không hợp lệ sẽ bị bỏ qua và giữ lựa chọn theo tên), `expression` (11 trạng thái), `gaze`, `size`, `frame` (`ink`/`bone`/`paper`/`none`), `square`, `riso`, `id`, `title`/`hideTitle`, `version`, `variant` (`peek`, `haze` hoặc `bloc`: cách vẽ mặt, không bao giờ thay đổi danh tính; một biến thể lạ sẽ vẽ như peek).
 
 ## Bản này port từ upstream phiên bản nào?
 
-Bản này port từ upstream @doan-labs/peek 1.1.0: hệ thống phụ kiện (eyewear, headwear, neckwear) trên nền engine 1.0. Các khuôn mặt không có phụ kiện vẫn render giống hệt trước đây đến từng byte.
+Bản này port từ upstream @doan-labs/peek 2.0.0: hệ thống phụ kiện của bản 1.1 (eyewear, headwear, neckwear) và các biến thể vẽ của bản 2.0 (haze, bloc) trên nền engine 1.0. Các khuôn mặt dùng biến thể peek vẫn render giống hệt trước đây đến từng byte. Corpus golden nay có 667 trường hợp, gồm cả các ca biến thể và biến thể kết hợp phụ kiện.
 
 ## Ghi chú cho việc tích hợp vào app
 

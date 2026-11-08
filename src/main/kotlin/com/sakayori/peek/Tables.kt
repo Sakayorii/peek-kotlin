@@ -126,6 +126,47 @@ val ACCESSORIES: LinkedHashMap<String, List<String>> = linkedMapOf(
     "neckwear" to listOf("none", "tie"),
 )
 
+/*
+ * Variants: how a face is drawn, never who it is. Every variant reads the
+ * same identity, so a name keeps its face, color and parts in all of them.
+ */
+val VARIANTS: List<String> = listOf("peek", "haze", "bloc")
+
+data class HazeDef(val tint: String, val glow: String)
+
+/**
+ * Haze, transcribed from the Haze sheet (01.3). Each ink has a glow and a
+ * tint; a body is hazed by the tint of one of its two neighbors on the hue
+ * wheel, so the tint is never picked by hand.
+ */
+val HAZE: LinkedHashMap<String, HazeDef> = linkedMapOf(
+    "lavender" to HazeDef("#C8B1F5", "#F2EDFD"),
+    "fog" to HazeDef("#9EC3F2", "#E6F1FF"),
+    "clay" to HazeDef("#F4AE93", "#FEECE5"),
+    "mint" to HazeDef("#A3DAB5", "#E5F5EA"),
+    "butter" to HazeDef("#E1CC7A", "#F4F0E0"),
+    "rose" to HazeDef("#F0A9C4", "#FDEAF1"),
+    "aqua" to HazeDef("#85D3DC", "#E0F5F7"),
+)
+
+/** The hue wheel, warm to cool: a body's warm side is the entry before it. */
+val WHEEL: List<String> = listOf("clay", "butter", "mint", "aqua", "fog", "lavender", "rose")
+
+/**
+ * Bloc's strong inks, palette P2 of the Bloc sheet (02.4): the same hue at
+ * OKLCH L 0.72 and C 0.12, butter, mint and aqua held lighter so none goes
+ * olive. The strong ink fills the dark half and the trait.
+ */
+val BLOC: LinkedHashMap<String, String> = linkedMapOf(
+    "lavender" to "#B093E5",
+    "fog" to "#7BA8DF",
+    "clay" to "#E38A66",
+    "mint" to "#82CB9B",
+    "butter" to "#E2CA6A",
+    "rose" to "#DF84A8",
+    "aqua" to "#5EC3CD",
+)
+
 /** How much of each list a version may pick from. Append-only. */
 val VERSIONS: Map<Int, LinkedHashMap<String, Int>> = mapOf(
     1 to linkedMapOf(

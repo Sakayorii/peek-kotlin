@@ -170,6 +170,110 @@ fun ringWalk(sh: FaceDef): Pair<Double, Double> {
     return if (u > RING_U) Pair(u + 20, u) else Pair(u, Double.NEGATIVE_INFINITY)
 }
 
+
+/*
+ * Haze, from the Haze sheet: the body is its own ink plus three soft radial
+ * blobs, cut to the outline. A deep one at the bottom, a tint from a hue
+ * neighbor low on the outer edge, a glow at the top. Where they sit comes
+ * from the name, mulberry32(fnv1a('haze:' + key)), so two faces of one
+ * color haze apart.
+ * Blob sizes are in body widths; the light level, used below 32px, keeps
+ * the face nearly peek where the haze would only be mud.
+ */
+private class HazeLevel(
+    val deep: DoubleArray,
+    val glow: DoubleArray,
+    val tint: DoubleArray,
+    val tintStops: List<DoubleArray>,
+)
+
+private val HAZE_LEVEL_MEDIUM = HazeLevel(
+    doubleArrayOf(0.502, 0.224),
+    doubleArrayOf(0.749, 0.337),
+    doubleArrayOf(0.4, 0.5),
+    listOf(doubleArrayOf(0.0, 0.878), doubleArrayOf(0.15, 0.878), doubleArrayOf(0.618, 0.396)),
+)
+private val HAZE_LEVEL_LIGHT = HazeLevel(
+    doubleArrayOf(0.298, 0.133),
+    doubleArrayOf(0.549, 0.247),
+    doubleArrayOf(0.31, 0.387),
+    listOf(doubleArrayOf(0.0, 0.549), doubleArrayOf(0.55, 0.247)),
+)
+
+fun hazePaint(who: Identity, o: DrawOpts): List<SNode> {
+    val sh = FACES[who.face]!!
+    val id = o.id
+    val L = if (o.size < 32) HAZE_LEVEL_LIGHT else HAZE_LEVEL_MEDIUM
+    // the body's box: the crown grown by its radius, down to the bottom
+    val xs = sh.crown.poly.map { it[0] }
+    val ys = sh.crown.poly.map { it[1] }
+    val x0 = xs.min() - sh.crown.r
+    val y0 = ys.min() - sh.crown.r
+    val W = xs.max() + sh.crown.r - x0
+    val H = sh.bottom - y0
+    // the sheet's own seed and draw order, fitted to its 12 names: never
+    // reorder these lines. The tint walks one track, low and out to high and in.
+    val rnd = mulberry32(fnv1a("haze:${who.key}"))
+    val warm = rnd() < 0.5
+    val left = rnd() < 0.5
+    val t = rnd()
+    val tintX = 0.04 + 0.174 * t
+    val tintY = 0.649 + 0.202 * t
+    val glowX = 0.38 - 0.12 * rnd()
+    val glowY = 0.12 + 0.099 * rnd()
+    val deepX = 0.251 - 0.151 * rnd()
+    val tintA = 90 - 180 * rnd()
+    fun at(inset: Double, onLeft: Boolean): Double = x0 + W * (if (onLeft) inset else 1 - inset)
+    val wi = WHEEL.indexOf(who.color)
+    val near = WHEEL[(wi + (if (warm) WHEEL.size - 1 else 1)) % WHEEL.size]
+    val bodyCol = COLORS[who.color]!!
+    fun blob(k: String, color: String, geo: DoubleArray, stops: List<DoubleArray>): SNode =
+        n(
+            "radialGradient", "haze.$k",
+            mapOf(
+                "id" to "$id-h${k[0]}",
+                "gradientUnits" to "userSpaceOnUse",
+                "cx" to 0, "cy" to 0, "r" to 1,
+                "gradientTransform" to "translate(${f2(geo[0])} ${f2(geo[1])}) rotate(${f2(geo[2])}) scale(${f2(geo[3])} ${f2(geo[4])})",
+            ),
+            (stops + listOf(doubleArrayOf(1.0, 0.0))).mapIndexed { j, stp ->
+                n(
+                    "stop", "haze.$k.$j",
+                    mapOf("offset" to stp[0], "stop-color" to color, "stop-opacity" to stp[1]),
+                )
+            },
+        )
+    fun fade(pr: DoubleArray): List<DoubleArray> =
+        listOf(doubleArrayOf(0.0, pr[0]), doubleArrayOf(0.55, pr[1]))
+    val blobs = listOf(
+        blob("deep", bodyCol.deep, doubleArrayOf(at(deepX, !left), y0 + H * 0.95, 0.0, W * 0.5, W * 0.35), fade(L.deep)),
+        blob("tint", HAZE[near]!!.tint, doubleArrayOf(at(tintX, left), y0 + H * tintY, tintA, W * L.tint[0], W * L.tint[1]), L.tintStops),
+        blob("glow", HAZE[who.color]!!.glow, doubleArrayOf(at(glowX, !left), y0 + H * glowY, 0.0, W * 0.475, W * 0.356), fade(L.glow)),
+    )
+    fun shape(key: String, paint: String): SNode = if (sh.body.d != null)
+        n(
+            "path", key, mapOf(
+                "d" to sh.body.d, "fill" to paint,
+                "stroke" to if (sh.body.stroke != null) paint else null,
+                "stroke-width" to sh.body.stroke,
+                "stroke-linejoin" to if (sh.body.stroke != null) "round" else null,
+            ),
+        )
+    else n(
+        "circle", key, mapOf(
+            "cx" to sh.body.circle!![0], "cy" to sh.body.circle!![1],
+            "r" to sh.body.circle!![2], "fill" to paint,
+        ),
+    )
+    return blobs + listOf(
+        n(
+            "g", "haze", mapOf("id" to "$id-hz"),
+            listOf(shape("haze.body", bodyCol.body)) +
+                listOf("deep", "tint", "glow").map { k2 -> shape("haze.$k2.fill", "url(#$id-h${k2[0]})") },
+        ),
+    )
+}
+
 fun draw(who: Identity, pose: Pose, o: DrawOpts): SNode {
     val sh = FACES[who.face]!!
     val color = COLORS[who.color]!!
@@ -298,7 +402,19 @@ fun draw(who: Identity, pose: Pose, o: DrawOpts): SNode {
     val B = sh.bottom
     val ty = baseY - alt * R
     fun sc(v: Double) = jsRound(v * 100000) / 100000.0
-    val bodyNode = if (sh.body.d != null)
+    val variant = o.variant
+    val haze = variant == "haze"
+    val front: List<SNode>
+    val back: List<SNode>
+    if (variant == "bloc") {
+        val blocResult = blocParts(who, pose, o, defs) { c -> g(c) }
+        front = blocResult.first
+        back = blocResult.second
+    } else {
+    if (haze) defs.addAll(hazePaint(who, o))
+    val bodyNode = if (haze)
+        n("use", "body", mapOf("href" to "#$id-hz"))
+    else if (sh.body.d != null)
         n(
             "path", "body", mapOf(
                 "d" to sh.body.d,
@@ -414,26 +530,45 @@ fun draw(who: Identity, pose: Pose, o: DrawOpts): SNode {
         val lrx = rx * 1.55
         val lry = ry * 1.15
         val top = ry + 1.6 - lower * ry * 1.5
+        // a bead has no white to show where it looks, so the whole eye leans
+        val etx = if (bead) ex + side * spread + gx * 6 else ex + side * spread
+        val ety = if (bead) ey + gy * 6 else ey
+        val lidNodes = listOf(
+            n(
+                "rect", "$kk.lid", mapOf(
+                    "x" to f2(-rx * 2.2), "y" to f2(-ry * 3),
+                    "width" to f2(rx * 4.4),
+                    "height" to f2(max(0.0, edge + ry * 3)),
+                    "transform" to "rotate(${f2(a)})", "fill" to fill,
+                ),
+            ),
+            n(
+                "ellipse", "$kk.lower", mapOf(
+                    "cx" to 0, "cy" to f2(top + lry),
+                    "rx" to f2(lrx), "ry" to f2(lry), "fill" to fill,
+                ),
+            ),
+        )
+        // Haze: the lids cut the body's own paint, so they never read as patches
+        if (haze)
+            defs.add(n("clipPath", "$kk.lidshape", mapOf("id" to "$id-s$i"), lidNodes))
         val parts = mutableListOf(
             n("g", "$kk.inner", mapOf("clip-path" to "url(#$id-e$i)"), inner),
             n(
                 "g", "$kk.lids", mapOf("clip-path" to "url(#$id-l$i)"),
-                listOf(
+                if (haze) listOf(
                     n(
-                        "rect", "$kk.lid", mapOf(
-                            "x" to f2(-rx * 2.2), "y" to f2(-ry * 3),
-                            "width" to f2(rx * 4.4),
-                            "height" to f2(max(0.0, edge + ry * 3)),
-                            "transform" to "rotate(${f2(a)})", "fill" to fill,
+                        "g", "$kk.lidpaint", mapOf("clip-path" to "url(#$id-s$i)"),
+                        listOf(
+                            n(
+                                "use", "$kk.lidbody", mapOf(
+                                    "href" to "#$id-hz",
+                                    "transform" to "translate(${f2(-etx)} ${f2(-ety)})",
+                                ),
+                            ),
                         ),
                     ),
-                    n(
-                        "ellipse", "$kk.lower", mapOf(
-                            "cx" to 0, "cy" to f2(top + lry),
-                            "rx" to f2(lrx), "ry" to f2(lry), "fill" to fill,
-                        ),
-                    ),
-                ),
+                ) else lidNodes,
             ),
         )
         // a rimmed eye inks its lid edges too, so the outline follows the lids
@@ -479,11 +614,7 @@ fun draw(who: Identity, pose: Pose, o: DrawOpts): SNode {
         )
         n(
             "g", kk, mapOf(
-                // a bead has no white to show where it looks, so the whole eye leans
-                "transform" to if (bead)
-                    "translate(${f2(ex + side * spread + gx * 6)} ${f2(ey + gy * 6)})"
-                else
-                    "translate(${f2(ex + side * spread)} ${jsNumToString(ey)})",
+                "transform" to "translate(${f2(etx)} ${f2(ety)})",
             ),
             parts,
         )
@@ -919,6 +1050,9 @@ fun draw(who: Identity, pose: Pose, o: DrawOpts): SNode {
             ),
         )
     }
+    front = listOf(bodyNode) + cheeks + listOf(trait)
+    back = eyes + brows + listOf(mouth) + wardrobe
+    }
     // the plates sit a hair out of register at large sizes
     fun off(dx: Double, dy: Double): String? =
         if (riso) "translate(${f2(dx * k * upp)} ${f2(dy * k * upp)})" else null
@@ -935,14 +1069,14 @@ fun draw(who: Identity, pose: Pose, o: DrawOpts): SNode {
                     "transform" to off(-0.55, 0.45),
                     "filter" to if (riso) "url(#$id-pA)" else null,
                 ),
-                listOf(bodyNode) + cheeks + listOf(trait),
+                front,
             ),
             n(
                 "g", "plateB", mapOf(
                     "transform" to off(0.6, -0.5),
                     "filter" to if (riso) "url(#$id-pB)" else null,
                 ),
-                eyes + brows + listOf(mouth) + wardrobe,
+                back,
             ),
         ),
     )
