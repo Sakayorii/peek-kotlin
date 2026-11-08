@@ -12,6 +12,9 @@ const BROWS = ['arch', 'bar', 'wedge', 'dash'];
 const MOUTHS = ['poly', 'round', 'line', 'box'];
 const CHEEKS = ['oval', 'dots', 'lines'];
 const TRAITS = ['square', 'fin', 'ring', 'dot', 'peak'];
+const EYEWEAR = ['glasses', 'sunglasses'];
+const HEADWEAR = ['bow', 'cap', 'sprout'];
+const NECKWEAR = ['tie'];
 
 // Seeded PRNG for reproducible fuzz (mulberry32, same as the lib).
 function rng(seed) {
@@ -50,8 +53,25 @@ const axisCases = [
   ...EYES.map((eyes) => ({ eyes })), ...BROWS.map((brows) => ({ brows })),
   ...MOUTHS.map((mouth) => ({ mouth })), ...CHEEKS.map((cheeks) => ({ cheeks })),
   ...TRAITS.map((trait) => ({ trait })),
+  ...EYEWEAR.map((eyewear) => ({ eyewear })), ...HEADWEAR.map((headwear) => ({ headwear })),
+  ...NECKWEAR.map((neckwear) => ({ neckwear })),
 ];
 for (const opts of axisCases) add('Sakayori', opts);
+// accessories: every slot alone (in axisCases above), full outfits,
+// combinations, and accessories combined with expressions and faces
+for (const eyewear of EYEWEAR) for (const headwear of HEADWEAR)
+  add('Sakayori', { eyewear, headwear, neckwear: 'tie' });
+for (const headwear of HEADWEAR) add('Rem', { headwear, eyewear: 'glasses' });
+for (const expression of EXPRESSIONS) {
+  add('Sakayori', { expression, eyewear: 'glasses', headwear: 'cap', neckwear: 'tie' });
+  add('Rem', { expression, eyewear: 'sunglasses', headwear: 'sprout' });
+  add('Nguyễn Văn An', { expression, headwear: 'bow' });
+}
+for (const face of FACES) add('Sakayori', { face, eyewear: 'sunglasses', headwear: 'cap', neckwear: 'tie' });
+add('Sakayori', { eyewear: 'glasses', size: 128 });
+add('Sakayori', { headwear: 'sprout', size: 24 });
+add('Sakayori', { neckwear: 'tie', expression: 'confused' });
+
 // sizes (strokeFor branches + riso smooth), frames, riso, square, titles
 for (const size of [24, 29, 30, 39, 40, 55, 56, 95, 96, 120, 480, 640])
   add('Sakayori', { size });

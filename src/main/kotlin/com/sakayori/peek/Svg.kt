@@ -17,6 +17,9 @@ data class PeekOptions(
     val mouth: String? = null,
     val cheeks: String? = null,
     val trait: String? = null,
+    val eyewear: String? = null,
+    val headwear: String? = null,
+    val neckwear: String? = null,
     val expression: String = "normal",
     /** [x, y] in -1..1, overrides the expression's gaze. */
     val gaze: DoubleArray? = null,
@@ -42,24 +45,34 @@ data class DrawOpts(
     val title: String?,
 )
 
-internal fun whoToJson(who: Identity): JVal = JVal.Obj(linkedMapOf(
-    "key" to JVal.Str(who.key),
-    "hash" to JVal.Num(who.hash.toDouble()),
-    "version" to JVal.Num(who.version.toDouble()),
-    "face" to JVal.Str(who.face),
-    "color" to JVal.Str(who.color),
-    "eyes" to JVal.Str(who.eyes),
-    "brows" to JVal.Str(who.brows),
-    "mouth" to JVal.Str(who.mouth),
-    "cheeks" to JVal.Str(who.cheeks),
-    "trait" to JVal.Str(who.trait),
-    "persona" to JVal.Obj(linkedMapOf(
+internal fun whoToJson(who: Identity, wardrobe: Boolean = true): JVal {
+    val entries = linkedMapOf<String, JVal>(
+        "key" to JVal.Str(who.key),
+        "hash" to JVal.Num(who.hash.toDouble()),
+        "version" to JVal.Num(who.version.toDouble()),
+        "face" to JVal.Str(who.face),
+        "color" to JVal.Str(who.color),
+        "eyes" to JVal.Str(who.eyes),
+        "brows" to JVal.Str(who.brows),
+        "mouth" to JVal.Str(who.mouth),
+        "cheeks" to JVal.Str(who.cheeks),
+        "trait" to JVal.Str(who.trait),
+    )
+    // Faces without accessories keep the byte-level peek@1 contract: their
+    // id hash is computed over the identity without the wardrobe fields.
+    if (wardrobe) {
+        entries["eyewear"] = JVal.Str(who.eyewear)
+        entries["headwear"] = JVal.Str(who.headwear)
+        entries["neckwear"] = JVal.Str(who.neckwear)
+    }
+    entries["persona"] = JVal.Obj(linkedMapOf(
         "spread" to JVal.Num(who.persona.spread),
         "blink" to JVal.Num(who.persona.blink),
         "add" to JVal.Obj(LinkedHashMap(who.persona.add.mapValues { JVal.Num(it.value) as JVal })),
         "mul" to JVal.Obj(LinkedHashMap(who.persona.mul.mapValues { JVal.Num(it.value) as JVal })),
-    )),
-))
+    ))
+    return JVal.Obj(entries)
+}
 
 internal fun poseToJson(pose: Pose): JVal {
     val entries = LinkedHashMap<String, JVal>()
@@ -76,6 +89,10 @@ internal fun lookToJson(o: PeekOptions, live: Boolean): JVal = JVal.Obj(linkedMa
     "live" to JVal.Bool(live),
 ))
 
+// an unknown item from untyped callers keeps what the name picked
+private fun wear(opt: String?, base: String, slot: String): String =
+    if (opt != null && ACCESSORIES[slot]!!.contains(opt)) opt else base
+
 fun settle(name: String, o: PeekOptions, live: Boolean = false): Triple<Identity, Pose, DrawOpts> {
     val base = identify(name, o.version)
     val who = base.copy(
@@ -86,12 +103,16 @@ fun settle(name: String, o: PeekOptions, live: Boolean = false): Triple<Identity
         mouth = o.mouth ?: base.mouth,
         cheeks = o.cheeks ?: base.cheeks,
         trait = o.trait ?: base.trait,
+        eyewear = wear(o.eyewear, base.eyewear, "eyewear"),
+        headwear = wear(o.headwear, base.headwear, "headwear"),
+        neckwear = wear(o.neckwear, base.neckwear, "neckwear"),
     )
+    val wardrobe = who.eyewear != "none" || who.headwear != "none" || who.neckwear != "none"
     val pose = restPose(who, o.expression, o.gaze)
     val id = o.id ?: "peek-${
         fnv1a(
             jsJsonStringify(
-                JVal.Arr(listOf(whoToJson(who), poseToJson(pose), lookToJson(o, live))),
+                JVal.Arr(listOf(whoToJson(who, wardrobe), poseToJson(pose), lookToJson(o, live))),
             ),
         ).toString(36)
     }"

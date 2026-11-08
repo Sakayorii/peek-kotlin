@@ -114,11 +114,24 @@ val PARTS: LinkedHashMap<String, List<String>> = linkedMapOf(
     "trait" to listOf("square", "fin", "ring", "dot", "peak"),
 )
 
+// The bow's single warm accent, transcribed from the accessory sheet.
+val ACCESSORY_INK: LinkedHashMap<String, String> = linkedMapOf(
+    "knot" to "#E5412D",
+)
+
+/** Independent wardrobe slots. peek@1 picks none; callers can dress it. */
+val ACCESSORIES: LinkedHashMap<String, List<String>> = linkedMapOf(
+    "eyewear" to listOf("none", "glasses", "sunglasses"),
+    "headwear" to listOf("none", "bow", "cap", "sprout"),
+    "neckwear" to listOf("none", "tie"),
+)
+
 /** How much of each list a version may pick from. Append-only. */
 val VERSIONS: Map<Int, LinkedHashMap<String, Int>> = mapOf(
     1 to linkedMapOf(
         "face" to 4, "color" to 7, "eyes" to 3, "brows" to 4,
         "mouth" to 4, "cheeks" to 3, "trait" to 5,
+        "eyewear" to 1, "headwear" to 1, "neckwear" to 1,
     ),
 )
 const val LATEST = 1

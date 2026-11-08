@@ -1,101 +1,93 @@
+**Tiếng Việt** | [English](README.en.md)
+
 # peek-kotlin
 
-Kotlin port of [peek-vanilla](https://github.com/Sakayorii/peek-vanilla) — itself a
-verified 1:1 port of [Peek](https://github.com/doan-labs/peek) by Doan Labs (MIT).
-A name in, a face out: deterministic avatars, no network, no database.
+Bản port Kotlin của [peek-vanilla](https://github.com/Sakayorii/peek-vanilla), mà peek-vanilla tự nó là bản port 1:1 đã được kiểm chứng của [Peek](https://github.com/doan-labs/peek) do Doan Labs làm (MIT).
+Một cái tên đưa vào, một khuôn mặt đi ra: avatar xác định, không mạng, không cơ sở dữ liệu.
 
-Part of the peek family: `peek` (original, React) · `peek-vanilla` (JS) ·
-`peek-kotlin` (JVM) · `peek-rust` (Rust).
+Thuộc family peek: `peek` (bản gốc, React), `peek-vanilla` (JS), `peek-kotlin` (JVM), `peek-rust` (Rust).
 
-## Get it
+## Lấy về dùng
 
-Via [JitPack](https://jitpack.io/#Sakayorii/peek-kotlin):
+Qua [JitPack](https://jitpack.io/#Sakayorii/peek-kotlin):
 
 ```kotlin
 repositories { maven("https://jitpack.io") }
-dependencies { implementation("com.github.Sakayorii:peek-kotlin:v1.0.1") }
+dependencies { implementation("com.github.Sakayorii:peek-kotlin:v1.1.0") }
 ```
 
 ```
 src/main/kotlin/com/sakayori/peek/
-├── Js.kt        — JavaScript semantics, exactly (number printing, tidy, JSON)
-│   ├── Identity.kt  — tidy / FNV-1a / mulberry32 / identify  (port of identity.js)
-│   ├── Tables.kt    — faces, colors, parts, expressions        (port of tables.js)
-│   ├── Scene.kt     — node tree model + prune                 (port of draw.js helpers)
-│   ├── Draw.kt      — the geometry: draw()                    (port of draw.js)
-│   └── Svg.kt       — settle / serialize / toSvg              (port of svg.js)
+├── Js.kt - Ngữ nghĩa JavaScript, chính xác (in số, tidy, JSON)
+│   ├── Identity.kt - tidy / FNV-1a / mulberry32 / identify  (port của identity.js)
+│   ├── Tables.kt - mặt, màu, bộ phận, biểu cảm        (port của tables.js)
+│   ├── Scene.kt - mô hình cây node + prune                 (port của các helper trong draw.js)
+│   ├── Draw.kt - phần hình học: draw()                    (port của draw.js)
+│   └── Svg.kt - settle / serialize / toSvg              (port của svg.js)
 ├── src/test/kotlin/com/sakayori/peek/
-│   ├── PeekGoldenTest.kt  — byte-identical golden tests (JUnit4)
-│   └── CorpusData.kt      — generated golden corpus (do not edit)
-├── gen-corpus.mjs   — regenerates CorpusData.kt from peek-vanilla
-└── verify.sh        — compiles with kotlinc and runs the tests (no Gradle needed)
+│   ├── PeekGoldenTest.kt - test golden byte-identical (JUnit4)
+│   └── CorpusData.kt - corpus golden được sinh ra (không sửa tay)
+├── gen-corpus.mjs - sinh lại CorpusData.kt từ peek-vanilla
+└── verify.sh - biên dịch bằng kotlinc và chạy test (không cần Gradle)
 ```
 
-## The 100% rule
+## Quy tắc 100%
 
-Every behavior of the original that affects output is reproduced, including the
-boring parts: JS `String(number)` formatting, `Math.round` ties, NFC
-normalization, locale-independent lowercasing, and `JSON.stringify` key order
-for the deterministic SVG ids.
+Mọi hành vi của bản gốc ảnh hưởng tới kết quả đều được tái hiện, kể cả những phần nhàm chán: định dạng `String(number)` của JS, cách `Math.round` xử lý số ở giữa, chuẩn hóa NFC, chuyển chữ thường không phụ thuộc locale, và thứ tự key của `JSON.stringify` cho các id SVG xác định.
 
-Proof is mechanical, not vibes: `./verify.sh` compiles the port and diffs
-`toSvg()` against peek-vanilla's output for 445 cases (curated names with
-unicode/emoji/whitespace edge cases, every expression, every part override,
-sizes, frames, riso, titles, plus 300 seeded fuzz names). One byte off fails.
+Bằng chứng là cơ học, không phải cảm tính: `./verify.sh` biên dịch bản port và so `toSvg()` với kết quả của peek-vanilla trên 500 trường hợp (tên được chọn lọc với các ca biên về unicode, emoji, khoảng trắng, mọi biểu cảm, mọi ghi đè bộ phận, mọi slot phụ kiện và các tổ hợp phụ kiện, kích thước, frame, riso, tiêu đề, cộng thêm 300 tên fuzz có seed). Lệch một byte là trượt.
 
 ```bash
-./verify.sh          # compile + run golden tests
-./verify.sh regen    # regenerate corpus from peek-vanilla first, then test
+./verify.sh          # biên dịch + chạy test golden
+./verify.sh regen    # sinh lại corpus từ peek-vanilla trước, rồi test
 ```
 
-Run tests: `./gradlew test` (regenerates the corpus automatically), or `./verify.sh`
-for a Gradle-free run with a local kotlinc.
+Chạy test bằng `./gradlew test` (tự sinh lại corpus), hoặc `./verify.sh` để chạy không cần Gradle với một kotlinc có sẵn ở máy.
 
 ## API
 
 ```kotlin
 import com.sakayori.peek.*
 
-// name in, SVG string out — same bytes as peek-vanilla for the same input
+// tên đưa vào, chuỗi SVG đi ra, cùng từng byte như peek-vanilla với cùng đầu vào
 val svg: String = toSvg("Sakayori")
 val svg2: String = toSvg("Sakayori", PeekOptions(expression = "happy", square = false))
 
-// identity without drawing
+// mặc phụ kiện: ba slot độc lập, mặc định đều là none
+val svg3: String = toSvg("Sakayori", PeekOptions(eyewear = "glasses", headwear = "sprout", neckwear = "tie"))
+
+// danh tính mà không cần vẽ
 val who: Identity = identify("Sakayori") // face, color, eyes, brows, mouth, cheeks, trait, persona
 ```
 
-`PeekOptions` mirrors peek-vanilla's `toSvg` props: `face`, `color`, `eyes`,
-`brows`, `mouth`, `cheeks`, `trait` (axis overrides win over the hash),
-`expression` (11 states), `gaze`, `size`, `frame` (`ink`/`bone`/`paper`/`none`),
-`square`, `riso`, `id`, `title`/`hideTitle`, `version`.
+`PeekOptions` mô phỏng các props `toSvg` của peek-vanilla: `face`, `color`, `eyes`, `brows`, `mouth`, `cheeks`, `trait`, `eyewear`, `headwear`, `neckwear` (ghi đè theo trục thắng hàm băm; một món phụ kiện không hợp lệ sẽ bị bỏ qua và giữ lựa chọn theo tên), `expression` (11 trạng thái), `gaze`, `size`, `frame` (`ink`/`bone`/`paper`/`none`), `square`, `riso`, `id`, `title`/`hideTitle`, `version`.
 
-## Notes for the app integration
+## Bản này port từ upstream phiên bản nào?
 
-- The core is pure Kotlin/JVM with zero dependencies — safe to call from anywhere.
-- `toSvg()` for a 64px avatar takes well under a millisecond; regenerating per
-  keystroke (the listen-together name field) is cheap.
-- The animated rig (`animate.js` → Compose) is a separate phase; this module is
-  the deterministic engine it will drive.
+Bản này port từ upstream @doan-labs/peek 1.1.0: hệ thống phụ kiện (eyewear, headwear, neckwear) trên nền engine 1.0. Các khuôn mặt không có phụ kiện vẫn render giống hệt trước đây đến từng byte.
+
+## Ghi chú cho việc tích hợp vào app
+
+- Phần lõi là Kotlin/JVM thuần, không phụ thuộc, gọi an toàn từ bất cứ đâu.
+- `toSvg()` cho một avatar 64px tốn ít hơn một mili giây; sinh lại sau mỗi lần gõ phím (ô nhập tên của tính năng listen-together) là rất rẻ.
+- Hệ thống animation (`animate.js` chuyển thành Compose) là một giai đoạn riêng; module này là engine xác định mà nó sẽ điều khiển.
 
 ## Animation
 
-`PeekAnimator` is a headless port of peek-vanilla's `Live` rig (springs,
-choreography, blinks incl. double blink, saccades, breathing, gaze, expression
-transitions, reduced motion) — minus the DOM. The host owns the frame loop:
-construct it, call `step(dt)` each frame, and draw the returned `Pose`.
+`PeekAnimator` là bản port không giao diện của hệ thống `Live` trong peek-vanilla (lò xo, biên đạo, chớp mắt kể cả chớp đôi, liếc mắt, thở, hướng nhìn, chuyển đổi biểu cảm, reduced motion), trừ phần DOM. Phía host sở hữu vòng lặp frame: tạo nó, gọi `step(dt)` ở mỗi frame, và vẽ `Pose` được trả về.
 
 ```kotlin
 val animator = PeekAnimator(identify("Sakayori"), "normal")
-// each frame:
+// mỗi frame:
 val pose = animator.step(dtSeconds)
-draw(animator.who, pose, drawOpts) // -> SNode, render it how you like
+draw(animator.who, pose, drawOpts) // -> SNode, render theo cách của bạn
 animator.setExpression("happy")
 ```
 
-Pointer gaze: `PeekAnimator(who, watchPointer = true)` + `updatePointer(...)`
-each frame. Reduced motion: `setReduced(true)` snaps to the rest pose.
-Pass a seeded `rng` for reproducible tests.
+Hướng nhìn theo con trỏ: `PeekAnimator(who, watchPointer = true)` cộng `updatePointer(...)` ở mỗi frame. Reduced motion: `setReduced(true)` sẽ nhảy thẳng tới tư thế nghỉ. Truyền một `rng` có seed để test tái hiện được.
 
-Verified pose-for-pose against the JS rig on 6 scripted scenarios
-(1800 poses: transitions, double blink, pointer/fixed gaze, all 11
-expressions, sleepy nods): worst drift 1.4e-15.
+Đã kiểm chứng từng tư thế một so với hệ thống JS trên 6 kịch bản có sẵn (1800 tư thế: chuyển đổi, chớp đôi, hướng nhìn theo con trỏ và cố định, cả 11 biểu cảm, gật đầu buồn ngủ): độ lệch lớn nhất 1.4e-15.
+
+## Giấy phép
+
+MIT, giống bản gốc. Xem file LICENSE.

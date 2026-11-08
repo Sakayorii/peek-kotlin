@@ -25,6 +25,11 @@ private const val FLOOR = 370.0
 private val THING = doubleArrayOf(330.0, 20.0)
 private val RAD = PI / 180
 
+// the sprout, drawn upward from where it is planted
+private const val STEM = "M0 0Q3 -19 0 -36"
+private const val LEAF0 = "M0 -33C-24 -30 -38 -52 -25 -53C-12 -54 -2 -43 0 -33Z"
+private const val LEAF1 = "M0 -33C5 -54 28 -61 27 -48C26 -36 11 -31 0 -33Z"
+
 fun clamp(v: Double, a: Double, b: Double): Double = if (v < a) a else if (v > b) b else v
 
 fun smooth(a: Double, b: Double, v: Double): Double {
@@ -696,6 +701,224 @@ fun draw(who: Identity, pose: Pose, o: DrawOpts): SNode {
         }
     }
     val trait = n("g", "trait", mapOf("transform" to traitT), listOf(shape))
+
+    // Wardrobe lives on the same body transform as the face. Glasses grow
+    // around the eye sockets, never around the pupils, so gaze stays free.
+    val wardrobe = mutableListOf<SNode>()
+    // strokes follow the same ramp as the face, capped so small hats stay hats
+    fun w(px: Double): String = f2(px * min(st, 1.6))
+    fun lineAttrs(
+        width: String,
+        d: String,
+        stroke: String = INK["ink"]!!,
+        fill: String = "none",
+    ): LinkedHashMap<String, Any?> = linkedMapOf(
+        "fill" to fill,
+        "stroke" to stroke,
+        "stroke-width" to width,
+        "stroke-linecap" to "round",
+        "stroke-linejoin" to "round",
+        "d" to d,
+    )
+    if (who.eyewear != "none") {
+        val lx = sh.eyes[0][0] - spread
+        val rr = sh.eyes[1][0] + spread
+        val ey = sh.eyes[0][1]
+        val gap = rr - lx
+        val erx = min(rx + 9, (gap - 15) / 2)
+        val ery = ry + 9
+        val glasses = who.eyewear == "glasses"
+        val lensX = if (glasses) erx else min(rx + 11, (gap - 12) / 2)
+        val top = if (glasses) ey - 4 else ey - ry - 2
+        val frames = mutableListOf<SNode>()
+        frames.add(
+            n(
+                "path", "eyewear.bridge",
+                lineAttrs(w(5.25), "M${f2(lx + lensX)} ${f2(top)}Q${f2((lx + rr) / 2)} ${f2(top - (if (glasses) 13.0 else 0.0))} ${f2(rr - lensX)} ${f2(top)}"),
+            ),
+        )
+        for ((i, cx) in listOf(lx, rr).withIndex()) {
+            val key = "eyewear.lens$i"
+            frames.add(
+                n(
+                    "path", "$key.arm",
+                    lineAttrs(
+                        w(5.25),
+                        if (i == 0) "M${f2(cx - lensX - 9)} ${f2(top + 2)}L${f2(cx - lensX)} ${f2(top)}"
+                        else "M${f2(cx + lensX)} ${f2(top)}L${f2(cx + lensX + 9)} ${f2(top + 2)}",
+                    ),
+                ),
+            )
+            if (glasses) {
+                frames.add(
+                    n(
+                        "ellipse", key,
+                        linkedMapOf<String, Any?>(
+                            "fill" to "none", "stroke" to INK["ink"]!!,
+                            "stroke-width" to w(5.25),
+                            "stroke-linecap" to "round", "stroke-linejoin" to "round",
+                            "cx" to f2(cx), "cy" to ey, "rx" to f2(erx), "ry" to f2(ery),
+                        ),
+                    ),
+                )
+                frames.add(
+                    n(
+                        "path", "$key.glint",
+                        lineAttrs(
+                            w(3.0),
+                            "M${f2(cx - erx * 0.65)} ${f2(ey - ery * 0.45)}Q${f2(cx - erx * 0.5)} ${f2(ey - ery * 0.8)} ${f2(cx - erx * 0.2)} ${f2(ey - ery * 0.86)}",
+                            stroke = INK["paper"]!!,
+                        ),
+                    ),
+                )
+            } else {
+                val h = ry * 2 + 9
+                frames.add(
+                    n(
+                        "path", key,
+                        linkedMapOf<String, Any?>(
+                            "d" to "M${f2(cx - lensX)} ${f2(top)}H${f2(cx + lensX)}V${f2(top + h * 0.55)}Q${f2(cx + lensX)} ${f2(top + h)} ${f2(cx)} ${f2(top + h)}Q${f2(cx - lensX)} ${f2(top + h)} ${f2(cx - lensX)} ${f2(top + h * 0.55)}Z",
+                            "fill" to INK["ink"]!!, "stroke" to INK["ink"]!!,
+                            "stroke-width" to w(3.0), "stroke-linejoin" to "round",
+                        ),
+                    ),
+                )
+                frames.add(
+                    n(
+                        "path", "$key.glint",
+                        lineAttrs(
+                            w(4.0),
+                            "M${f2(cx - lensX * 0.58)} ${f2(top + 19)}l8 -8m-1 15 6 -6",
+                            stroke = INK["paper"]!!,
+                        ),
+                    ),
+                )
+                frames.add(
+                    n(
+                        "circle", "$key.pin",
+                        mapOf(
+                            "cx" to f2(cx + lensX * 0.55), "cy" to f2(top + h - 9),
+                            "r" to 1.7, "fill" to INK["paper"]!!,
+                        ),
+                    ),
+                )
+            }
+        }
+        wardrobe.add(n("g", "eyewear", emptyMap(), frames))
+    }
+    if (who.headwear != "none") {
+        // Reserve the side opposite the crest. The seat stays fixed through
+        // expressions, so a moving crest never makes a hat switch sides.
+        val side = if (who.trait == "ring" || who.trait == "dot") -1 else 1
+        val cap = who.headwear == "cap"
+        val sprout = who.headwear == "sprout"
+        // The sheet measures placement across the crown, not along its arc.
+        // Solve that horizontal offset so low, round faces keep the brim above
+        // their brows instead of walking the hat down the side of the body.
+        val inset = if (sprout) -6.0 else if (cap) -8.0 else 0.0
+        val offset = if (sprout) 34.0 else 40.0
+        var lo = 0.0
+        var hi = 160.0
+        for (i in 0 until 16) {
+            val mid = (lo + hi) / 2
+            val pt = seat(sh.crown, inset, side * mid)
+            if (side * (pt.x - 170) < offset) lo = mid else hi = mid
+        }
+        val anchor = seat(sh.crown, inset, side * (lo + hi) / 2)
+        val angle = clamp(anchor.a, -40.0, 40.0)
+        val parts = mutableListOf<SNode>()
+        if (cap) {
+            parts.add(
+                n(
+                    "path", "headwear.crown",
+                    lineAttrs(w(5.25), "M-33 0C-35 -20 -20 -39 0 -39C20 -39 35 -20 33 0Z", fill = INK["paper"]!!),
+                ),
+            )
+            parts.add(n("path", "headwear.seam", lineAttrs(w(3.5), "M-4 -38Q9 -24 8 -1")))
+            parts.add(
+                n(
+                    "path", "headwear.brim",
+                    lineAttrs(w(7.0), if (side > 0) "M-35 1Q8 4 52 3" else "M-52 3Q-8 4 35 1"),
+                ),
+            )
+            parts.add(
+                n(
+                    "circle", "headwear.button",
+                    mapOf("cx" to 0, "cy" to -40, "r" to 3.5, "fill" to INK["ink"]!!),
+                ),
+            )
+        } else if (sprout) {
+            parts.add(
+                // a body-colored halo keeps the ink stem off an ink ground
+                n("path", "headwear.halo", lineAttrs(w(11.0), "$STEM$LEAF0$LEAF1", stroke = fill)),
+            )
+            parts.add(n("path", "headwear.stem", lineAttrs(w(4.5), STEM)))
+            parts.add(
+                n(
+                    "path", "headwear.leaf0",
+                    lineAttrs(w(4.0), LEAF0, fill = COLORS["mint"]!!.body),
+                ),
+            )
+            parts.add(
+                n(
+                    "path", "headwear.leaf1",
+                    lineAttrs(w(4.0), LEAF1, fill = COLORS["mint"]!!.deep),
+                ),
+            )
+        } else {
+            parts.add(
+                n(
+                    "path", "headwear.wings",
+                    mapOf(
+                        "d" to "M-3 0C-13 -16 -28 -23 -29 -10C-31 2 -26 19 -16 13L-3 4L3 4L16 13C26 19 31 2 29 -10C28 -23 13 -16 3 0Z",
+                        "fill" to INK["ink"]!!,
+                        // the same halo, painted under the fill
+                        "stroke" to fill,
+                        "stroke-width" to w(6.0),
+                        "stroke-linejoin" to "round",
+                        "paint-order" to "stroke",
+                    ),
+                ),
+            )
+            parts.add(
+                n(
+                    "ellipse", "headwear.knot",
+                    mapOf(
+                        "cx" to 0, "cy" to 1, "rx" to 6, "ry" to 8,
+                        "fill" to ACCESSORY_INK["knot"]!!,
+                    ),
+                ),
+            )
+        }
+        wardrobe.add(
+            n(
+                "g", "headwear",
+                mapOf(
+                    "transform" to "translate(${f2(anchor.x)} ${f2(anchor.y)}) rotate(${f2(if (sprout) angle * 0.5 else angle)})",
+                ),
+                parts,
+            ),
+        )
+    }
+    if (who.neckwear == "tie") {
+        // The knot follows the mouth's lowest edge, including its skew. The
+        // floor clips the blade, just as it clips the creature itself.
+        val skew = abs(sin(g("mk") * RAD)) * mw
+        val bottom = max(0.0, max(mt * kb, mb * kb)) + skew + m.sw * st
+        wardrobe.add(
+            n(
+                "g", "neckwear",
+                mapOf(
+                    "transform" to "translate(${jsNumToString(m.x)} ${f2(m.y + g("my") + bottom + 8)})",
+                    "fill" to INK["ink"]!!,
+                ),
+                listOf(
+                    n("path", "neckwear.knot", mapOf("d" to "M-9 0Q-11 0 -9 4L-5 11Q0 15 5 11L9 4Q11 0 9 0Z")),
+                    n("path", "neckwear.blade", mapOf("d" to "M-4 15L-13 63Q-14 66 -11 69L0 79L11 69Q14 66 13 63L4 15Z")),
+                ),
+            ),
+        )
+    }
     // the plates sit a hair out of register at large sizes
     fun off(dx: Double, dy: Double): String? =
         if (riso) "translate(${f2(dx * k * upp)} ${f2(dy * k * upp)})" else null
@@ -719,7 +942,7 @@ fun draw(who: Identity, pose: Pose, o: DrawOpts): SNode {
                     "transform" to off(0.6, -0.5),
                     "filter" to if (riso) "url(#$id-pB)" else null,
                 ),
-                eyes + brows + listOf(mouth),
+                eyes + brows + listOf(mouth) + wardrobe,
             ),
         ),
     )

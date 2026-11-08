@@ -48,6 +48,9 @@ val LISTS: LinkedHashMap<String, List<String>> = linkedMapOf(
     "mouth" to PARTS["mouth"]!!,
     "cheeks" to PARTS["cheeks"]!!,
     "trait" to PARTS["trait"]!!,
+    "eyewear" to ACCESSORIES["eyewear"]!!,
+    "headwear" to ACCESSORIES["headwear"]!!,
+    "neckwear" to ACCESSORIES["neckwear"]!!,
 )
 
 /** The axes in readout order. */
@@ -74,6 +77,9 @@ data class Identity(
     val mouth: String,
     val cheeks: String,
     val trait: String,
+    val eyewear: String,
+    val headwear: String,
+    val neckwear: String,
     val persona: Persona,
 )
 
@@ -118,6 +124,9 @@ fun identify(name: String, version: Int = LATEST): Identity {
         mouth = pick("mouth"),
         cheeks = pick("cheeks"),
         trait = pick("trait"),
+        eyewear = pick("eyewear"),
+        headwear = pick("headwear"),
+        neckwear = pick("neckwear"),
         persona = persona,
     )
 }
